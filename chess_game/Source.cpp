@@ -6,9 +6,12 @@
 #include<math.h>
 #include <stdio.h>
 #include<stdlib.h>
+#include "graphics_window.h"
 using namespace std;
 HWND a = GetConsoleWindow();
-HDC c = GetDC(a);
+// Drawing goes to an off-screen canvas shown in its own window (see graphics_window.h);
+// drawing on the console window itself no longer works on current Windows.
+HDC c = gfx::create_surface();
 PAINTSTRUCT ps;
 POINT point;
 int console_size_x = 1920, console_size_y = 1080;
@@ -31,7 +34,9 @@ struct danger_area
 {
 	int white = -1;
 	int black = -1;
-}kill_area[64];
+}kill_area[1024]; // only entries 0..63 are read; killer_area() can write past 64, and with the
+                  // current compiler that overwrote rec_R (square size) and broke the board drawing
+                  // and mouse hit-testing. The spare room absorbs those writes.
 int pices_center[64][3];
 int rec_R = 125 / 2; int reqeid_pices[4] = { 16,24,32,40 };
 static int num = 0; int selected_rooms[2]; static bool g_input = false; static bool not_moved = true; bool can_rev = false; static int i = 0; static bool no_return = true;
@@ -320,6 +325,10 @@ void pice_drowing(int num) {
 	}
 }
 void paint_errors(int cod_no) {
+	// -1 means "no square selected"; drawing it would read outside pices_center
+	// and leave a stray square on the screen.
+	if (cod_no < 0 || cod_no > 63)
+		return;
 	if (pices_center[cod_no][2]) {
 		//HBRUSH pice_color_1 = CreateSolidBrush(RGB(500, 500, 500));
 		//SelectObject(c, GetStockObject(GRAY_BRUSH));
@@ -796,10 +805,7 @@ void get_input_2() {
 	set_j();
 	//if (color_selection != j) {
 		static bool point_moved = true; static bool check = true; static bool first_time = true; not_test = true;
-		GetCursorPos(&point);
-		point.x *= 1.25;
-		point.y *= 1.25;
-		point.y -= 30;
+		gfx::get_cursor(&point);
 		for (register int j = 0; j < 64; j++) {
 			if (abs(point.x - pices_center[j][0]) < rec_R && abs(point.y - pices_center[j][1]) < rec_R && moveing_point != j && j != selected_rooms[0]) {
 				if (moveing_point != selected_rooms[0])
@@ -2462,10 +2468,7 @@ void paint_options(bool can_paint) {
 				first_time = false;
 			paint_side(i);
 		}
-		GetCursorPos(&point);
-		point.x *= 1.25;
-		point.y *= 1.25;
-		point.y -= 30;
+		gfx::get_cursor(&point);
 		static int place = 0;
 		for (int i = 0; i < 4; i++) {
 			if (abs(point.x - rec_R) < rec_R && abs(point.y - pices_center[reqeid_pices[i]][1]) < rec_R) {
